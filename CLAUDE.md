@@ -20,7 +20,11 @@ Wrapper scripts live in `Src/winampAll/`: `build_winampAll_2019.cmd` builds all 
 
 Build output: each project builds into `<PlatformShortName>_<Configuration>\` next to its `.vcxproj`. A post-build `xcopy` then gathers binaries into `Build\Winamp_<arch>_<config>\` (plugins go in `Plugins\`), which gives you a runnable install tree.
 
-Known stale solution entries: `Src\vlb\vlb.vcxproj` and `Src\Plugins\DSP\sc_serv3\sc_serv.vcxproj` are referenced by the `.sln` but are missing from the tree.
+Sources not in the open-source release: `Src/vlb` (Dolby VLB decoder; removed from the `.sln` and from `in_mp3`) and `Src/Plugins/DSP/sc_serv3` (so `dsp_sc` can't build). Qt and CEF aren't in the repo, so the Qt-based `Src/Components/wac_*` projects fail too.
+
+### CI build (usable from Linux)
+
+`.github/workflows/build-windows.yml` builds Release|Win32 on a GitHub Windows runner and uploads `Build/Winamp_x86_Release` (artifact `Winamp_x86_Release`) plus `msbuild*.log`; the run summary lists failing projects. It runs on pushes to `community` and `ci/**`, or `gh workflow run build-windows.yml`. Fetch it with `gh run download <id> -n Winamp_x86_Release` and run it under Wine (`WINEPREFIX=~/.wine-winamp wine winamp.exe`). The workflow encodes several non-obvious fixes, and each one is explained in a comment next to it: vcpkg is pinned and built with the v142 toolset through `.github/vcpkg-triplets/`, vcpkg is wired in with `ForceImport*CppTargets` instead of `integrate install`, the spdlog overlay is skipped, and it sets `CL=/DFMT_UNICODE#0`. `winampv6` lists ~100 plugins as solution dependencies (for build order only), so the workflow also builds `winampv6.vcxproj` on its own, and one broken plugin doesn't block `winamp.exe`.
 
 ### One-time dependency setup (Windows)
 
