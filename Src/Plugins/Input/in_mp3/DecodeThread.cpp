@@ -7,6 +7,8 @@
 #include "config.h"
 #include <shlwapi.h>
 #include "adts.h"
+#include "api__in_mp3.h"
+#include <api/service/waServiceFactory.h>
 #include <foundation/error.h>
 
 // {19450308-90D7-4E45-8A9D-DC71E67123E2}
