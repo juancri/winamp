@@ -308,7 +308,6 @@ xcopy /Y /D $(IntDir)$(TargetName).pdb ..\..\..\..\Build\Winamp_$(PlatformShortN
     <ClInclude Include="..\..\..\Wasabi\api\service\svcs\svc_metatag.h" />
     <ClInclude Include="AACFrame.h" />
     <ClInclude Include="adts.h" />
-    <ClInclude Include="adts_vlb.h" />
     <ClInclude Include="AlbumArt.h" />
     <ClInclude Include="apev2.h" />
     <ClInclude Include="api__in_mp3.h" />
@@ -342,7 +341,6 @@ xcopy /Y /D $(IntDir)$(TargetName).pdb ..\..\..\..\Build\Winamp_$(PlatformShortN
     <ClCompile Include="..\..\..\nu\listview.cpp" />
     <ClCompile Include="..\..\..\nu\RingBuffer.cpp" />
     <ClCompile Include="AACFrame.cpp" />
-    <ClCompile Include="adts_vlb.cpp" />
     <ClCompile Include="AlbumArt.cpp" />
     <ClCompile Include="apev2.cpp" />
     <ClCompile Include="config.cpp" />

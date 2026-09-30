@@ -22,7 +22,6 @@
 #include "CVbriHeader.h"
 #include "jnetlib/jnetlib.h"
 
-#include "../vlb/dataio.h"
 #include "ID3v2.h"
 #include "LAMEInfo.h"
 #include "../nu/RingBuffer.h"
@@ -33,7 +32,7 @@
 
 /*-------------------------------------------------------------------------*/
 
-class CGioFile : public DataIOControl, public ifc_mpeg_stream_reader
+class CGioFile : public ifc_mpeg_stream_reader
 {
 public:
 	CGioFile();
@@ -59,14 +58,6 @@ public:
 	int EndOf(void)
 	{
 		return IsEof();
-	}
-	int DICGetLastError()
-	{
-		return DATA_IO_ERROR_NONE;
-	}
-	int DICGetDirection()
-	{
-		return DATA_IO_READ;
 	}
 
 	unsigned int GetAvgVBRBitrate(void)

@@ -4,9 +4,6 @@
     <ClCompile Include="AACFrame.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="adts_vlb.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="AlbumArt.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -103,9 +100,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="adts.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="adts_vlb.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="apev2.h">

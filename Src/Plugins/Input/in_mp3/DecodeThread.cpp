@@ -7,7 +7,6 @@
 #include "config.h"
 #include <shlwapi.h>
 #include "adts.h"
-#include "adts_vlb.h"
 #include <foundation/error.h>
 
 // {19450308-90D7-4E45-8A9D-DC71E67123E2}
@@ -531,19 +530,13 @@ DWORD DecodeLoop::OpenDecoder()
 	mod.UsesOutputPlug &= ~8;
 	if (isAac)
 	{
-		if (isEAAC)
-		{
-				waServiceFactory *factory = mod.service->service_getServiceByGuid(adts_aac_guid);
-				if (factory)
-					decoder = (adts *)factory->getInterface();
+		// The Dolby VLB decoder (Src/vlb) isn't part of the open-source release, so plain AAC
+		// also goes through the AAC service instead of falling back to ADTS_VLB.
+		waServiceFactory *factory = mod.service->service_getServiceByGuid(adts_aac_guid);
+		if (factory)
+			decoder = (adts *)factory->getInterface();
 
-				mod.UsesOutputPlug|=8;
-		}
-		if (!decoder)
-		{
-			decoder = new ADTS_VLB;
-			mod.UsesOutputPlug &= ~8;
-		}
+		mod.UsesOutputPlug|=8;
 	}
 	else
 	{
