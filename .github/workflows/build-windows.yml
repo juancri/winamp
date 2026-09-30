@@ -70,6 +70,10 @@ jobs:
           git clone https://github.com/microsoft/vcpkg.git || exit /b 1
           git -C vcpkg checkout -q 2023.04.15 || exit /b 1
           call vcpkg\bootstrap-vcpkg.bat -disableMetrics || exit /b 1
+          rem 7-zip.org no longer serves 21.07, which this vcpkg pins; same files (same SHA512) from ip7z/7zip.
+          if not exist vcpkg\downloads mkdir vcpkg\downloads
+          curl -fsSL -o vcpkg\downloads\7z2107-extra.7z https://github.com/ip7z/7zip/releases/download/21.07/7z2107-extra.7z || exit /b 1
+          curl -fsSL -o vcpkg\downloads\7z2107-x64.msi https://github.com/ip7z/7zip/releases/download/21.07/7z2107-x64.msi || exit /b 1
           xcopy /K /Y /H /C /I /E vcpkg-ports\* vcpkg\ports\* || exit /b 1
           vcpkg\vcpkg.exe install ^
             alac:x86-windows-static-md ^
