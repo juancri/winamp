@@ -65,7 +65,10 @@ jobs:
         shell: cmd
         run: |
           if not exist vcpkg-bincache mkdir vcpkg-bincache
+          rem Pinned: the overlay ports in vcpkg-ports/ date from late 2022/early 2023 and break on
+          rem newer vcpkg (e.g. freetype's brotli patch vs. brotli 1.1+).
           git clone https://github.com/microsoft/vcpkg.git || exit /b 1
+          git -C vcpkg checkout -q 2023.04.15 || exit /b 1
           call vcpkg\bootstrap-vcpkg.bat -disableMetrics || exit /b 1
           vcpkg\vcpkg.exe integrate install || exit /b 1
           xcopy /K /Y /H /C /I /E vcpkg-ports\* vcpkg\ports\* || exit /b 1
