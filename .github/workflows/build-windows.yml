@@ -61,24 +61,25 @@ jobs:
           restore-keys: vcpkg-
 
       # Mirrors install-packages.cmd, minus the Qt/CEF archives that aren't in this repo.
+      # freetype skips its default brotli feature: the overlay port's brotli patch doesn't match
+      # current brotli, and nothing in Winamp links brotli.
+      # Keep going on a failing port so the solution build still runs and shows what else breaks.
       - name: Install vcpkg dependencies
+        id: vcpkg
+        continue-on-error: true
         shell: cmd
         run: |
           if not exist vcpkg-bincache mkdir vcpkg-bincache
-          rem Pinned: the overlay ports in vcpkg-ports/ date from late 2022/early 2023 and break on
-          rem newer vcpkg (e.g. freetype's brotli patch vs. brotli 1.1+).
+          rem Pinned for reproducibility. Old vcpkg releases (e.g. 2023.04.15, closer in age to the
+          rem overlay ports) no longer work: their pinned 7-Zip and MSYS2 downloads are gone.
           git clone https://github.com/microsoft/vcpkg.git || exit /b 1
-          git -C vcpkg checkout -q 2023.04.15 || exit /b 1
+          git -C vcpkg checkout -q 4cb050be2cfa7a947cdd2dd1a70e24b17774c979 || exit /b 1
           call vcpkg\bootstrap-vcpkg.bat -disableMetrics || exit /b 1
-          rem 7-zip.org no longer serves 21.07, which this vcpkg pins; same files (same SHA512) from ip7z/7zip.
-          if not exist vcpkg\downloads mkdir vcpkg\downloads
-          curl -fsSL -o vcpkg\downloads\7z2107-extra.7z https://github.com/ip7z/7zip/releases/download/21.07/7z2107-extra.7z || exit /b 1
-          curl -fsSL -o vcpkg\downloads\7z2107-x64.msi https://github.com/ip7z/7zip/releases/download/21.07/7z2107-x64.msi || exit /b 1
           xcopy /K /Y /H /C /I /E vcpkg-ports\* vcpkg\ports\* || exit /b 1
-          vcpkg\vcpkg.exe install ^
+          vcpkg\vcpkg.exe install --keep-going ^
             alac:x86-windows-static-md ^
             expat:x86-windows-static-md expat:x86-windows-static ^
-            freetype:x86-windows-static-md ^
+            freetype[core,bzip2,png,zlib]:x86-windows-static-md ^
             ijg-libjpeg:x86-windows-static-md ^
             libflac:x86-windows-static-md ^
             libogg:x86-windows-static-md ^
@@ -97,7 +98,7 @@ jobs:
             zlib:x86-windows-static-md zlib:x86-windows-static
 
       - name: Upload vcpkg logs on failure
-        if: failure()
+        if: steps.vcpkg.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: vcpkg-logs
@@ -143,7 +144,7 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          "## Build result: ${{ steps.build.outcome }}" >> $env:GITHUB_STEP_SUMMARY
+          "## vcpkg: ${{ steps.vcpkg.outcome }}, build: ${{ steps.build.outcome }}" >> $env:GITHUB_STEP_SUMMARY
           if (Test-Path msbuild-errors.log) {
             $failed = Select-String -Path msbuild-errors.log -Pattern '\[([^\]]+\.vcxproj)' -AllMatches |
               ForEach-Object { $_.Matches } | ForEach-Object { Split-Path $_.Groups[1].Value -Leaf } | Sort-Object -Unique
