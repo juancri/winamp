@@ -70,9 +70,6 @@ jobs:
           git clone https://github.com/microsoft/vcpkg.git || exit /b 1
           git -C vcpkg checkout -q 2023.04.15 || exit /b 1
           call vcpkg\bootstrap-vcpkg.bat -disableMetrics || exit /b 1
-          rem The 2023 vcpkg tool doesn't create this folder itself, and the runner doesn't have it.
-          mkdir "%ProgramFiles(x86)%\MSBuild\Microsoft.Cpp\v4.0\V140\ImportBefore\Default" 2>nul
-          vcpkg\vcpkg.exe integrate install || exit /b 1
           xcopy /K /Y /H /C /I /E vcpkg-ports\* vcpkg\ports\* || exit /b 1
           vcpkg\vcpkg.exe install ^
             alac:x86-windows-static-md ^
@@ -123,6 +120,8 @@ jobs:
       - uses: microsoft/setup-msbuild@v2
 
       # Keep going past failing projects (e.g. the Qt-based wac_* components) so the rest still land in Build\.
+      # vcpkg is wired in via ForceImport instead of `vcpkg integrate install`, which the 2023 tool
+      # can't do on this runner.
       - name: Build winampAll_2019.sln (Release|Win32)
         id: build
         continue-on-error: true
@@ -131,6 +130,8 @@ jobs:
           msbuild winampAll_2019.sln /m /nologo /v:m
           /p:Configuration=Release /p:Platform=Win32
           /p:WindowsTargetPlatformVersion=10.0.19041.0
+          "/p:ForceImportBeforeCppTargets=%VCPKG_ROOT%\scripts\buildsystems\msbuild\vcpkg.props"
+          "/p:ForceImportAfterCppTargets=%VCPKG_ROOT%\scripts\buildsystems\msbuild\vcpkg.targets"
           /fl1 /flp1:logfile=msbuild-errors.log;errorsonly
           /fl2 /flp2:logfile=msbuild.log;verbosity=normal
 
