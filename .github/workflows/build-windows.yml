@@ -1,0 +1,159 @@
+name: Build (Windows x86)
+
+# Produces a runnable Build\Winamp_x86_Release tree as an artifact, e.g. for running under Wine.
+# Only x86 is built: the vcpkg triplets in the projects are all x86-windows-static(-md).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [community, 'ci/**']
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 300
+    env:
+      VCPKG_ROOT: ${{ github.workspace }}\vcpkg
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg-bincache
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The solution mixes v141, v142, v143 and ClangCL projects; the runner only guarantees v143.
+      - name: Add older MSVC toolsets, ATL/MFC and ClangCL
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          $components = @(
+            'Microsoft.VisualStudio.Component.VC.v141.x86.x64',
+            'Microsoft.VisualStudio.Component.VC.v141.ATL',
+            'Microsoft.VisualStudio.Component.VC.v141.MFC',
+            'Microsoft.VisualStudio.Component.VC.14.29.16.11.x86.x64',
+            'Microsoft.VisualStudio.Component.VC.14.29.16.11.ATL',
+            'Microsoft.VisualStudio.Component.VC.14.29.16.11.MFC',
+            'Microsoft.VisualStudio.Component.VC.ATL',
+            'Microsoft.VisualStudio.Component.VC.ATLMFC',
+            'Microsoft.VisualStudio.Component.VC.Llvm.Clang',
+            'Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset',
+            'Microsoft.VisualStudio.Component.Windows10SDK.19041'
+          )
+          $installArgs = @('modify', '--installPath', "`"$vs`"", '--quiet', '--norestart', '--nocache')
+          foreach ($c in $components) { $installArgs += @('--add', $c) }
+          $p = Start-Process "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe" -ArgumentList $installArgs -Wait -PassThru
+          if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { throw "vs_installer exited with $($p.ExitCode)" }
+
+      # README: "Microsoft ATLMFC lib fix" (::DeleteFile -> DeleteFile in atltransactionmanager.h).
+      - name: Patch atltransactionmanager.h
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          Get-ChildItem "$vs\VC\Tools\MSVC\*\atlmfc\include\atltransactionmanager.h" | ForEach-Object {
+            (Get-Content $_.FullName -Raw).Replace('return ::DeleteFile((LPTSTR)lpFileName);', 'return DeleteFile((LPTSTR)lpFileName);') |
+              Set-Content $_.FullName -NoNewline
+            Write-Host "patched $($_.FullName)"
+          }
+
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: vcpkg-bincache
+          key: vcpkg-${{ hashFiles('vcpkg-ports/**', '.github/workflows/build-windows.yml') }}
+          restore-keys: vcpkg-
+
+      # Mirrors install-packages.cmd, minus the Qt/CEF archives that aren't in this repo.
+      - name: Install vcpkg dependencies
+        shell: cmd
+        run: |
+          if not exist vcpkg-bincache mkdir vcpkg-bincache
+          git clone https://github.com/microsoft/vcpkg.git || exit /b 1
+          call vcpkg\bootstrap-vcpkg.bat -disableMetrics || exit /b 1
+          vcpkg\vcpkg.exe integrate install || exit /b 1
+          xcopy /K /Y /H /C /I /E vcpkg-ports\* vcpkg\ports\* || exit /b 1
+          vcpkg\vcpkg.exe install ^
+            alac:x86-windows-static-md ^
+            expat:x86-windows-static-md expat:x86-windows-static ^
+            freetype:x86-windows-static-md ^
+            ijg-libjpeg:x86-windows-static-md ^
+            libflac:x86-windows-static-md ^
+            libogg:x86-windows-static-md ^
+            libpng:x86-windows-static-md ^
+            libsndfile:x86-windows-static-md ^
+            libtheora:x86-windows-static-md ^
+            libvorbis:x86-windows-static-md ^
+            libvpx:x86-windows-static-md ^
+            minizip:x86-windows-static-md ^
+            mp3lame:x86-windows-static-md ^
+            mpg123:x86-windows-static-md ^
+            openssl:x86-windows-static-md openssl:x86-windows-static ^
+            pthread:x86-windows-static-md pthread:x86-windows-static ^
+            restclient-cpp:x86-windows-static-md restclient-cpp:x86-windows-static ^
+            spdlog:x86-windows-static-md ^
+            zlib:x86-windows-static-md zlib:x86-windows-static
+
+      - name: Upload vcpkg logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vcpkg-logs
+          path: vcpkg/buildtrees/**/*.log
+
+      - name: Unpack libvpx and libmpg123
+        shell: cmd
+        working-directory: Src/winampAll
+        run: |
+          for /f "usebackq delims=" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VSDIR=%%i
+          call "%VSDIR%\VC\Auxiliary\Build\vcvars32.bat" || exit /b 1
+          call unpack_libvpx_v1.8.2_msvc16.cmd < nul
+          call unpack_libmpg123.cmd < nul
+          if not exist ..\libvpx_v1.8.2_msvc16 exit /b 1
+          if not exist ..\libmpg123 exit /b 1
+
+      # winampv6's post-build xcopies Qt DLLs from here; give it something to copy so the step doesn't fail.
+      - name: Stub Qt DLL folder
+        shell: cmd
+        run: |
+          mkdir Qt\DLL_5.12_x86\Release
+          echo Qt DLLs are not part of this repository.> Qt\DLL_5.12_x86\Release\README.txt
+
+      - uses: microsoft/setup-msbuild@v2
+
+      # Keep going past failing projects (e.g. the Qt-based wac_* components) so the rest still land in Build\.
+      - name: Build winampAll_2019.sln (Release|Win32)
+        id: build
+        continue-on-error: true
+        shell: cmd
+        run: >
+          msbuild winampAll_2019.sln /m /nologo /v:m
+          /p:Configuration=Release /p:Platform=Win32
+          /p:WindowsTargetPlatformVersion=10.0.19041.0
+          /fl1 /flp1:logfile=msbuild-errors.log;errorsonly
+          /fl2 /flp2:logfile=msbuild.log;verbosity=normal
+
+      - name: Summarize failures
+        if: always()
+        shell: pwsh
+        run: |
+          "## Build result: ${{ steps.build.outcome }}" >> $env:GITHUB_STEP_SUMMARY
+          if (Test-Path msbuild-errors.log) {
+            $failed = Select-String -Path msbuild-errors.log -Pattern '\[([^\]]+\.vcxproj)' -AllMatches |
+              ForEach-Object { $_.Matches } | ForEach-Object { Split-Path $_.Groups[1].Value -Leaf } | Sort-Object -Unique
+            "Projects with errors ($($failed.Count)):" >> $env:GITHUB_STEP_SUMMARY
+            $failed | ForEach-Object { "- $_" } >> $env:GITHUB_STEP_SUMMARY
+          }
+          if (Test-Path Build\Winamp_x86_Release\winamp.exe) { "winamp.exe: built" >> $env:GITHUB_STEP_SUMMARY }
+          else { "winamp.exe: MISSING" >> $env:GITHUB_STEP_SUMMARY }
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: msbuild-logs
+          path: msbuild*.log
+
+      - name: Upload Winamp build
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Winamp_x86_Release
+          path: Build/Winamp_x86_Release
+          if-no-files-found: warn
