@@ -31,6 +31,9 @@ jobs:
             'Microsoft.VisualStudio.Component.VC.14.29.16.11.x86.x64',
             'Microsoft.VisualStudio.Component.VC.14.29.16.11.ATL',
             'Microsoft.VisualStudio.Component.VC.14.29.16.11.MFC',
+            'Microsoft.VisualStudio.Component.VC.14.29.16.11.x86.x64.Spectre',
+            'Microsoft.VisualStudio.Component.VC.14.29.16.11.ATL.Spectre',
+            'Microsoft.VisualStudio.Component.VC.14.29.16.11.MFC.Spectre',
             'Microsoft.VisualStudio.Component.VC.ATL',
             'Microsoft.VisualStudio.Component.VC.ATLMFC',
             'Microsoft.VisualStudio.Component.VC.Llvm.Clang',
@@ -75,8 +78,10 @@ jobs:
           git clone https://github.com/microsoft/vcpkg.git || exit /b 1
           git -C vcpkg checkout -q 4cb050be2cfa7a947cdd2dd1a70e24b17774c979 || exit /b 1
           call vcpkg\bootstrap-vcpkg.bat -disableMetrics || exit /b 1
-          xcopy /K /Y /H /C /I /E vcpkg-ports\* vcpkg\ports\* || exit /b 1
-          vcpkg\vcpkg.exe install --keep-going ^
+          rem spdlog is left at upstream: the overlay's 1.10.0 doesn't compile against current fmt.
+          robocopy vcpkg-ports vcpkg\ports /E /XD spdlog /NFL /NDL /NJH /NJS
+          if errorlevel 8 exit /b 1
+          vcpkg\vcpkg.exe install --keep-going --overlay-triplets=.github\vcpkg-triplets ^
             alac:x86-windows-static-md ^
             expat:x86-windows-static-md expat:x86-windows-static ^
             freetype[core,bzip2,png,zlib]:x86-windows-static-md ^
