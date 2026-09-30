@@ -70,6 +70,8 @@ jobs:
           git clone https://github.com/microsoft/vcpkg.git || exit /b 1
           git -C vcpkg checkout -q 2023.04.15 || exit /b 1
           call vcpkg\bootstrap-vcpkg.bat -disableMetrics || exit /b 1
+          rem The 2023 vcpkg tool doesn't create this folder itself, and the runner doesn't have it.
+          mkdir "%ProgramFiles(x86)%\MSBuild\Microsoft.Cpp\v4.0\V140\ImportBefore\Default" 2>nul
           vcpkg\vcpkg.exe integrate install || exit /b 1
           xcopy /K /Y /H /C /I /E vcpkg-ports\* vcpkg\ports\* || exit /b 1
           vcpkg\vcpkg.exe install ^
